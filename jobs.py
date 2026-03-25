@@ -1,11 +1,9 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from models import db, Job
 from flask_jwt_extended import jwt_required
-from utils.decorators import admin_required
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from flask import current_app
 
 jobs_bp = Blueprint('jobs', __name__, url_prefix='/api/jobs')
 
@@ -21,12 +19,11 @@ def get_job(job_id):
 
 @jobs_bp.route('', methods=['POST'])
 @jwt_required()
-@admin_required()
 def create_job():
     data = request.get_json()
     if not data or 'title' not in data or 'description' not in data or 'salary' not in data:
         return jsonify({"message": "Missing required fields: title, description, salary"}), 400
-    
+
     new_job = Job(
         title=data['title'],
         description=data['description'],
@@ -38,24 +35,22 @@ def create_job():
 
 @jobs_bp.route('/<int:job_id>', methods=['PUT'])
 @jwt_required()
-@admin_required()
 def update_job(job_id):
     job = Job.query.get_or_404(job_id)
     data = request.get_json()
-    
+
     if 'title' in data:
         job.title = data['title']
     if 'description' in data:
         job.description = data['description']
     if 'salary' in data:
         job.salary = float(data['salary'])
-        
+
     db.session.commit()
     return jsonify({"message": "Job updated", "job": job.to_dict()}), 200
 
 @jobs_bp.route('/<int:job_id>', methods=['DELETE'])
 @jwt_required()
-@admin_required()
 def delete_job(job_id):
     job = Job.query.get_or_404(job_id)
     db.session.delete(job)
@@ -75,21 +70,19 @@ def submit_application_letter():
     try:
         msg = MIMEMultipart('alternative')
         msg['Subject'] = f"New Application Letter from {data['name']}"
-        msg['From']    = f"Worklify Platform <{username}>"
-        msg['To']      = username  # Send to own admin address
+        msg['From'] = f"Worklify Platform <{username}>"
+        msg['To'] = username
 
         text_body = f"Name: {data['name']}\nEmail: {data['email']}\nTarget Job: {data['job_title']}\n\nLetter:\n{data['letter']}"
         msg.attach(MIMEText(text_body, 'plain'))
 
-        # Only send if password isn't empty, otherwise it's local test mode
         if password:
             with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
                 server.login(username, password)
                 server.sendmail(username, username, msg.as_string())
+
     except Exception as exc:
         current_app.logger.error(f"[application-letter] Email send failed: {exc}")
-        # Return standard 500 if email actually fails to send
-        return jsonify({"message": "Failed to send email. Ensure API email variables are configured."}), 500
+        return jsonify({"message": "Failed to send email."}), 500
 
     return jsonify({"message": "Application letter sent successfully."}), 200
-
