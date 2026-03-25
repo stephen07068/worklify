@@ -3,7 +3,7 @@
 from flask import Blueprint, request, jsonify
 from models import db, Job
 from flask_jwt_extended import jwt_required
-from utils.decorators import admin_required
+# from utils.decorators import admin_required
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -23,7 +23,7 @@ def get_job(job_id):
 
 @jobs_bp.route('', methods=['POST'])
 @jwt_required()
-@admin_required()
+
 def create_job():
     data = request.get_json()
     if not data or 'title' not in data or 'description' not in data or 'salary' not in data:
